@@ -2,9 +2,7 @@
   "compilerOptions": {
     "outDir": "./dist/",
     "noImplicitAny": true,
-    "module": "es6",
-    "target": "es6",
-    "allowJs": true,
+    "target": "es2018",
     "moduleResolution": "node",
     "strictFunctionTypes": false,
     "skipLibCheck": true,
