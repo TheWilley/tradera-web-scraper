@@ -1,7 +1,7 @@
 {
-  "name": "tradera-bid-monitor",
+  "name": "tradera-web-scraper",
   "version": "1.0.0",
-  "description": "A CLI tool to check the current price of a bid on Tradera.se",
+  "description": "A CLI tool to scrape data from Tradera.se",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
