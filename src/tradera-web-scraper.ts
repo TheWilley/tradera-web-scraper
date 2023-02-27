@@ -159,8 +159,9 @@ async function setup() {
         process.exit(0);
     }
 
-    if (await browserInstance.waitForSelector(".not-found-container")) {
-        console.log("Page not found");
+    // Check if page is not found and exit if not
+    if (await browserInstance.evaluate(() => { document.querySelector(".not-found-container") == undefined ? true : false })) {
+        console.log("Page returned 404");
         process.exit(0);
     }
 
@@ -171,8 +172,6 @@ async function setup() {
     } catch (e) {
         console.log("Could not click accept cookies");
     }
-
-    await browserInstance.screenshot({ path: "screenshot.png" });
 }
 
 /**
@@ -213,8 +212,12 @@ async function startBrowser(product_url: string) {
     await setup();
 }
 
+/**
+ * Get item type (auction or product)
+ * @returns The item type (auction or product)
+ */
 async function getItemType() {
-    if (await puppeteerHelper().getSelectorText(".bid-details-bids-title", (result) => { return result.includes("Bud") ? false : true; }) == true) {
+    if (await puppeteerHelper().getSelectorText(".bid-details-time-title")) {
         return "auction"
     } else {
         return "product"
@@ -234,7 +237,7 @@ async function getProductInfo(product_url: string) {
     if (await getItemType() == "auction") {
         pageInfo = {
             sellerName: await puppeteerHelper().getSelectorText(".seller-alias"),
-            isAuction: await puppeteerHelper().getSelectorText(".bid-details-bids-title", (result) => { return result.includes("Bud") ? false : true; }),
+            isAuction: await puppeteerHelper().getSelectorText(".bid-details-bids-title", (result) => { return result.includes("Bud") ? true : false; }),
             aucutionName: await puppeteerHelper().getSelectorText("#view-item-main"),
             auctionEnded: await puppeteerHelper().getSelectorText(".my-auto > .heading-london", (result) => { return result.includes("Avslutad") ? true : false; }),
             allBids: await puppeteerHelper().getAllBids(),
