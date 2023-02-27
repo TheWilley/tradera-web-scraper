@@ -6,10 +6,10 @@ let browserInstance: Page;
 interface Bid {
     bidder: string;
     bid: number;
-    time: string;
+    time: number;
 }
 
-// AuctionInfo is the information that is available on the auction page
+// AuctionInfo is the information that is available on a auction page (e.g. a bid)
 interface AuctionInfo {
     // Acution and seller information
     sellerName: string;
@@ -36,15 +36,38 @@ interface AuctionInfo {
     images: string[];
 }
 
+// ProductInfo is the information that is available on a product page and is not an auction (e.g. buy now)
+interface ProductInfo {
+    // Acution and seller information
+    sellerName: string;
+    isAuction: boolean;
+    productName: string;
+    productSold: boolean;
+
+    // Buy now information
+    buyNowPrice: number;
+
+    // Other information
+    description: string;
+    images: string[];
+}
+
+// CompiledPageObject is the object that is returned from the getAuctionInfo function and contains either AuctionInfo or ProductInfo
+type PageInfo = AuctionInfo | ProductInfo;
+
 /**
  * Helper functions for puppeteer
  * @returns A helper object with functions that can be used to get information from the auction page
  */
 function puppeteerHelper() {
     return {
-        getSelectorText: async (selector: string, callback?: (_result_: string) => unknown) => {
+        getSelectorText: async (selector: string, callback?: (_result_: string) => unknown, callbackError?: (_result_: string) => unknown) => {
+            // To make the variable available in the catch block
+            var _result_;
+
+            // Try to get the text from the selector
             try {
-                const _result_ = await browserInstance.evaluate((selector: string) => {
+                _result_ = await browserInstance.evaluate((selector: string) => {
                     const element = document.querySelector(selector);
 
                     return (element as HTMLElement).innerText;
@@ -56,7 +79,8 @@ function puppeteerHelper() {
                 else
                     return _result_;
             } catch (e) {
-                console.log("Could not get selector text");
+                if (callbackError) return callbackError(_result_)
+                else return undefined;
             }
 
         },
@@ -77,12 +101,15 @@ function puppeteerHelper() {
                     bids.push({
                         bidder: bidder,
                         bid: parseFloat(bid.replace("kr", "")),
-                        time: time
+                        time: Date.parse(time)
                     });
                 });
 
                 return bids;
             });
+
+            // Close bid history
+            await browserInstance.click(".bid-details-bids-title > span > a");
 
             // Check if callback is defined and return result
             if (callback)
@@ -91,6 +118,22 @@ function puppeteerHelper() {
                 return _result_;
         },
         async getAllImages() {
+            /**
+             * Remove duplicates from an array (https://www.geeksforgeeks.org/how-to-remove-duplicate-elements-from-javascript-array/)
+             * @param array The array to remove duplicates from
+             * @returns The array without duplicates
+             */
+            const removeDuplicates = (array: string[]) => {
+                var uniqueStrings: string[] = [];
+                array.forEach(element => {
+                    if (!uniqueStrings.includes(element)) {
+                        uniqueStrings.push(element);
+                    }
+                });
+
+                return uniqueStrings;
+            }
+
             const _result_ = await browserInstance.evaluate(() => {
                 const images: string[] = [];
                 const imageElements = document.querySelectorAll(".image-gallery-item__image");
@@ -101,7 +144,7 @@ function puppeteerHelper() {
                 return images;
             });
 
-            return _result_;
+            return removeDuplicates(_result_);
         }
     };
 }
@@ -123,6 +166,8 @@ async function setup() {
     } catch (e) {
         console.log("Could not click accept cookies");
     }
+
+    await browserInstance.screenshot({ path: "screenshot.png" });
 }
 
 /**
@@ -130,11 +175,31 @@ async function setup() {
  * @param auction_url The url to the auction
  */
 async function startBrowser(auction_url: string) {
-    //launch browser in headless mode
+    /**
+     * Validate url string (https://www.freecodecamp.org/news/check-if-a-javascript-string-is-a-url/)
+     * @param urlString The url to validate
+     * @returns True if the url is valid, false if not
+     */
+    const isValidUrl = (urlString: string) => {
+        var urlPattern = new RegExp('^(https?:\\/\\/)?' + // validate protocol
+            '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // validate domain name
+            '((\\d{1,3}\\.){3}\\d{1,3}))' + // validate OR ip (v4) address
+            '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // validate port and path
+            '(\\?[;&a-z\\d%_.~+=-]*)?' + // validate query string
+            '(\\#[-a-z\\d_]*)?$', 'i'); // validate fragment locator
+        return !!urlPattern.test(urlString);
+    }
+
+    // Check if auction url is valid
+    if (auction_url == undefined || !isValidUrl(auction_url) || !/^.*tradera\.(com|se)\/item.*$/.test(auction_url)) {
+        console.log("No auction url provided, invalid url or url is not a tradera item");
+        process.exit(0);
+    }
+    // Launch browser in headless mode
     const browser = await pt.launch();
-    //browser new page
+    // Browser new page
     const page = await browser.newPage();
-    //launch URL
+    // Launch URL
     await page.goto(auction_url);
     // Set browser instance
     browserInstance = page;
@@ -143,32 +208,55 @@ async function startBrowser(auction_url: string) {
     await setup();
 }
 
+async function getItemType() {
+    if (await puppeteerHelper().getSelectorText(".bid-details-bids-title", (result) => { return result.includes("Bud") ? false : true; }) == true) {
+        return "auction"
+    } else {
+        return "product"
+    }
+}
+
 /**
  * Get auction information
  */
-async function getAuctionInfo() {
-    await startBrowser("https://www.tradera.com/item/344630/583933118/miitopia-nintendo-switch-");
+async function getAuctionInfo(auction_ur: string) {
+    var pageInfo: PageInfo;
+
+    // Start browser
+    await startBrowser(auction_ur);
 
     // TODO: Make all selectors use jsselector from chromiun dev tools instead of css selectors (they are more reliable)
-    const auctionInfo: AuctionInfo = {
-        sellerName: await puppeteerHelper().getSelectorText(".seller-alias"),
-        isAuction: await puppeteerHelper().getSelectorText(".bid-details-bids-title", (result) => { return result.includes("Bud") ? true : false; }),
-        aucutionName: await puppeteerHelper().getSelectorText("#view-item-main"),
-        auctionEnded: await puppeteerHelper().getSelectorText(".my-auto > .heading-london", (result) => { return result.includes("Avslutad") ? true : false; }),
-        allBids: await puppeteerHelper().getAllBids(),
-        numberOfBids: (await puppeteerHelper().getAllBids()).length,
-        highestBid: await puppeteerHelper().getSelectorText(".bid-details-amount > span > span", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }),
-        timeLeft: await puppeteerHelper().getSelectorText("#collapsed_auction_details > div > aside > div.separators_sm-separator__lOmzL.pb-md-2.mb-md-2 > section.bid-details.d-flex.flex-md-column.justify-content-between.py-1.pt-md-0.pb-md-2 > div.d-flex.flex-column.flex-md-row.justify-content-between.mb-md-2.text-center > div.my-auto > p > span", (result) => { return result != "Avslutad" ? result : 0; }),
-        latestBid: await puppeteerHelper().getAllBids((result) => { return result[0]; }),
-        buyNowPrice: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }),
-        buyNowAvailable: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return result == undefined ? false : true; }),
-        description: await puppeteerHelper().getSelectorText(".overflow-hidden.text-break.position-relative"),
-        images: await puppeteerHelper().getAllImages(),
-        endTime: await puppeteerHelper().getSelectorText("#collapsed_auction_details > div > aside > div.separators_sm-separator__lOmzL.pb-md-2.mb-md-2 > section.bid-details.d-flex.flex-md-column.justify-content-between.py-1.pt-md-0.pb-md-2 > div.d-flex.flex-column.flex-md-row.justify-content-between.mb-md-2.text-center > div.mb-1.mb-md-0 > p", (result) => { return result.replace("Avslutas ", ""); })
-    };
+    if (await getItemType() == "auction") {
+        pageInfo = {
+            sellerName: await puppeteerHelper().getSelectorText(".seller-alias"),
+            isAuction: await puppeteerHelper().getSelectorText(".bid-details-bids-title", (result) => { return result.includes("Bud") ? false : true; }),
+            aucutionName: await puppeteerHelper().getSelectorText("#view-item-main"),
+            auctionEnded: await puppeteerHelper().getSelectorText(".my-auto > .heading-london", (result) => { return result.includes("Avslutad") ? true : false; }),
+            allBids: await puppeteerHelper().getAllBids(),
+            numberOfBids: (await puppeteerHelper().getAllBids()).length,
+            highestBid: await puppeteerHelper().getSelectorText(".bid-details-amount > span > span", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }),
+            timeLeft: await puppeteerHelper().getSelectorText("div.flex-md-row:nth-child(2) > div:nth-child(2) > p:nth-child(1)", (result) => { return result != "Avslutad" ? result : 0; }),
+            latestBid: await puppeteerHelper().getAllBids((result) => { return result[0]; }),
+            buyNowPrice: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }, () => { return 0 }),
+            buyNowAvailable: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return true; }, () => { return false }),
+            description: await puppeteerHelper().getSelectorText(".overflow-hidden.text-break.position-relative"),
+            images: await puppeteerHelper().getAllImages(),
+            endTime: await puppeteerHelper().getSelectorText("#collapsed_auction_details > div > aside > div.separators_sm-separator__lOmzL.pb-md-2.mb-md-2 > section.bid-details.d-flex.flex-md-column.justify-content-between.py-1.pt-md-0.pb-md-2 > div.d-flex.flex-column.flex-md-row.justify-content-between.mb-md-2.text-center > div.mb-1.mb-md-0 > p", (result) => { return result.replace("Avslutas ", ""); })
+        };
+    } else {
+        pageInfo = {
+            sellerName: "",
+            isAuction: false,
+            productName: "",
+            productSold: false,
+            buyNowPrice: 0,
+            description: "",
+            images: []
+        }
+    }
 
-    console.log(auctionInfo);
+    console.log(pageInfo);
     process.exit(0);
 }
 
-getAuctionInfo();
+getAuctionInfo(process.argv[2]);

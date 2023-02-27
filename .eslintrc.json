@@ -22,10 +22,12 @@
 		"quotes": [
 			"error",
 			"double"
-		]
-	},
-	"plugins": [
-		"@typescript-eslint"
-	],
-	"ignorePatterns": ""
-}
+		],
+		"rules": {
+			"@typescript-eslint/no-var-requires": 0
+		},
+		"plugins": [
+			"@typescript-eslint"
+		],
+		"ignorePatterns": ""
+	}
