@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --sourcemap --watch",
-    "start": "node index/indes.js"
+    "dev": "tsc --sourcemap --watch"
   },
   "author": "TheWilley",
   "license": "MIT",

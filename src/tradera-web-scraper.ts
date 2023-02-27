@@ -57,7 +57,7 @@ type PageInfo = AuctionInfo | ProductInfo;
 
 /**
  * Helper functions for puppeteer
- * @returns A helper object with functions that can be used to get information from the auction page
+ * @returns A helper object with functions that can be used to get information from the product page
  */
 function puppeteerHelper() {
     return {
@@ -155,7 +155,12 @@ function puppeteerHelper() {
 async function setup() {
     // Check if page url contains "item" and exit if not
     if (!browserInstance.url().includes("item")) {
-        console.log("Not an auction page (page might have been removed)");
+        console.log("Not an product page (page might have been removed)");
+        process.exit(0);
+    }
+
+    if (await browserInstance.waitForSelector(".not-found-container")) {
+        console.log("Page not found");
         process.exit(0);
     }
 
@@ -172,9 +177,9 @@ async function setup() {
 
 /**
  * Start browser instance
- * @param auction_url The url to the auction
+ * @param product_url The url to the product
  */
-async function startBrowser(auction_url: string) {
+async function startBrowser(product_url: string) {
     /**
      * Validate url string (https://www.freecodecamp.org/news/check-if-a-javascript-string-is-a-url/)
      * @param urlString The url to validate
@@ -190,9 +195,9 @@ async function startBrowser(auction_url: string) {
         return !!urlPattern.test(urlString);
     }
 
-    // Check if auction url is valid
-    if (auction_url == undefined || !isValidUrl(auction_url) || !/^.*tradera\.(com|se)\/item.*$/.test(auction_url)) {
-        console.log("No auction url provided, invalid url or url is not a tradera item");
+    // Check if product url is valid
+    if (product_url == undefined || !isValidUrl(product_url) || !/^.*tradera\.(com|se)\/item.*$/.test(product_url)) {
+        console.log("No product url provided, invalid url or url is not a tradera item");
         process.exit(0);
     }
     // Launch browser in headless mode
@@ -200,7 +205,7 @@ async function startBrowser(auction_url: string) {
     // Browser new page
     const page = await browser.newPage();
     // Launch URL
-    await page.goto(auction_url);
+    await page.goto(product_url);
     // Set browser instance
     browserInstance = page;
 
@@ -217,13 +222,13 @@ async function getItemType() {
 }
 
 /**
- * Get auction information
+ * Get product information
  */
-async function getAuctionInfo(auction_ur: string) {
+async function getProductInfo(product_url: string) {
     var pageInfo: PageInfo;
 
     // Start browser
-    await startBrowser(auction_ur);
+    await startBrowser(product_url);
 
     // TODO: Make all selectors use jsselector from chromiun dev tools instead of css selectors (they are more reliable)
     if (await getItemType() == "auction") {
@@ -259,4 +264,14 @@ async function getAuctionInfo(auction_ur: string) {
     process.exit(0);
 }
 
-getAuctionInfo(process.argv[2]);
+// Check if the module is being executed as the main module or not
+if (require.main === module) {
+    // If the module is being executed as the main module,
+    // call getProductInfo with the first command line argument
+    const product_url = process.argv[2];
+    getProductInfo(product_url);
+} else {
+    // If the module is being required as a library,
+    // export the getProductInfo function
+    module.exports = { getProductInfo: getProductInfo };
+}
