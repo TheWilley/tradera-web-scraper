@@ -109,9 +109,6 @@ function puppeteerHelper() {
             // Close bid history
             await browserInstance.click(".tr-modal-header > button:nth-child(2)");
 
-            // screenshot
-            await browserInstance.screenshot({ path: "screenshot.png" });
-
             // Check if callback is defined and return result
             return _result_;
         },
@@ -152,18 +149,21 @@ function puppeteerHelper() {
  */
 async function setup() {
     // Check if page url contains "item" and exit if not
+    console.log("Checking if page is a product page...")
     if (!browserInstance.url().includes("item")) {
         console.log("Not an product page (page might have been removed)");
         process.exit(0);
     }
 
     // Check if page is not found and exit if not
+    console.log("Checking if page is not found...")
     if (await puppeteerHelper().getSelectorText(".not-found-container", "innerHTML", (result) => result != undefined ? true : false)) {
         console.log("Page returned 404");
         process.exit(0);
     }
 
     // Attempt to accept cookies
+    console.log("Attempting to accept cookies...")
     try {
         await browserInstance.waitForSelector("#qc-cmp2-ui > div.qc-cmp2-footer.qc-cmp2-footer-overlay.qc-cmp2-footer-scrolled > div > button.css-14ubilm");
         await browserInstance.click("#qc-cmp2-ui > div.qc-cmp2-footer.qc-cmp2-footer-overlay.qc-cmp2-footer-scrolled > div > button.css-14ubilm");
@@ -172,12 +172,15 @@ async function setup() {
     }
 
     // Attempt to remove language selection
+    console.log("Attempting to remove language selection...")
     try {
         await browserInstance.waitForSelector("#tr-modal-body > div.position-absolute", { timeout: 1000 });
         await browserInstance.click("#tr-modal-body > div.position-absolute > button");
     } catch (e) {
         console.log("Could not remove language selection");
     }
+
+    console.log("All checks passed, starting scraping...")
 }
 
 /**
@@ -265,6 +268,7 @@ async function getProductInfo(product_url: string) {
     }
 
     console.log(pageInfo);
+    console.log("Done scraping")
     process.exit(0);
 }
 
