@@ -19,16 +19,15 @@ interface AuctionInfo {
 
     // Bid information
     allBids: Bid[];
-    highestBid: number;
-    latestBid: Bid
+    highestBid: string;
     numberOfBids: number;
 
     // Time information
-    timeLeft: number;
-    endTime: number;
+    timeLeft: string;
+    endTime: string;
 
     // Buy now information
-    buyNowPrice: number;
+    buyNowPrice: string;
     buyNowAvailable: boolean;
 
     // Other information
@@ -65,7 +64,6 @@ function puppeteerHelper() {
             // To make the variable available in the catch block
             var _result_;
 
-            console.log("Getting text from selector: " + selector + " (" + property + ")")
             // Try to get the text from the selector
             try {
                 _result_ = await browserInstance.$eval(selector, (element, property) => { return element[property] }, property);
@@ -77,14 +75,17 @@ function puppeteerHelper() {
                 else
                     return _result_
             } catch (e) {
-                return "Error";
+                if (callback)
+                    return callback(undefined);
+                else
+                    return undefined;
             }
 
         },
-        getAllBids: async (callback?: (_result_: Bid[]) => unknown) => {
+        getAllBids: async () => {
             // Open bid history
             await browserInstance.click(".bid-details-bids-title > span > a");
-            await browserInstance.waitForSelector(".bid-details-bids-title > span > a");
+            await browserInstance.waitForSelector(".tr-modal-container");
 
             // Wait for bid history to load and get all bids
             const _result_ = await browserInstance.evaluate(() => {
@@ -109,10 +110,7 @@ function puppeteerHelper() {
             await browserInstance.click(".bid-details-bids-title > span > a");
 
             // Check if callback is defined and return result
-            if (callback)
-                return callback(_result_);
-            else
-                return _result_;
+            return _result_;
         },
         async getAllImages() {
             /**
@@ -157,7 +155,7 @@ async function setup() {
     }
 
     // Check if page is not found and exit if not
-    if (await browserInstance.evaluate(() => { document.querySelector(".not-found-container") == undefined ? true : false })) {
+    if (await puppeteerHelper().getSelectorText(".not-found-container", "innerHTML", (result) => result != undefined ? true : false)) {
         console.log("Page returned 404");
         process.exit(0);
     }
@@ -214,8 +212,8 @@ async function startBrowser(product_url: string) {
  * @returns The item type (auction or product)
  */
 async function getItemType() {
+    // TODO: Check if auction is ended
     return "auction"
-
 }
 
 /**
@@ -227,23 +225,21 @@ async function getProductInfo(product_url: string) {
     // Start browser
     await startBrowser(product_url);
 
-    // TODO: Make all selectors use jsselector from chromiun dev tools instead of css selectors (they are more reliable)
     if (await getItemType() == "auction") {
         pageInfo = {
             sellerName: await puppeteerHelper().getSelectorText(".seller-alias", "textContent") as string, // Use this format
             isAuction: await puppeteerHelper().getSelectorText(".bid-details-bids-title", "innerHTML", (result) => { return result ? true : false }) as boolean,
-            aucutionName: await puppeteerHelper().getSelectorText("#view-item-main"),
-            auctionEnded: await puppeteerHelper().getSelectorText(".my-auto > .heading-london"),
-            allBids: await puppeteerHelper().getAllBids(),
-            numberOfBids: (await puppeteerHelper().getAllBids()).length,
-            highestBid: await puppeteerHelper().getSelectorText(".bid-details-amount > span > span", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }),
-            timeLeft: await puppeteerHelper().getSelectorText("div.flex-md-row:nth-child(2) > div:nth-child(2) > p:nth-child(1)", (result) => { return result != "Avslutad" ? result : 0; }),
-            latestBid: await puppeteerHelper().getAllBids((result) => { return result[0]; }),
-            buyNowPrice: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }, () => { return 0 }),
-            buyNowAvailable: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return true; }, () => { return false }),
-            description: await puppeteerHelper().getSelectorText(".overflow-hidden.text-break.position-relative"),
+            aucutionName: await puppeteerHelper().getSelectorText("#view-item-main", "textContent") as string,
+            auctionEnded: await puppeteerHelper().getSelectorText("div.flex-md-row:nth-child(2) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)", "innerHTML", (result) => { return result == undefined ? true : false }) as boolean,
+            highestBid: await puppeteerHelper().getSelectorText(".animate-on-value-change_animate-on-value-change__vU1Oh > span:nth-child(1)", "textContent", (result) => { return result; }) as string,
+            timeLeft: await puppeteerHelper().getSelectorText("div.flex-md-row:nth-child(2) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)", "textContent", (result) => { return result != undefined ? result : 0 }) as string,
+            buyNowPrice: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", "textContent", (result) => { return result != undefined ? result : 0 }) as string,
+            buyNowAvailable: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", "textContent", (result) => { return result != undefined ? false : true }) as boolean,
+            description: await puppeteerHelper().getSelectorText(".overflow-hidden.text-break.position-relative", "textContent") as string,
+            allBids: await puppeteerHelper().getAllBids() as Bid[],
+            numberOfBids: (await puppeteerHelper().getAllBids() as Bid[]).length,
             images: await puppeteerHelper().getAllImages(),
-            endTime: await puppeteerHelper().getSelectorText("#collapsed_auction_details > div > aside > div.separators_sm-separator__lOmzL.pb-md-2.mb-md-2 > section.bid-details.d-flex.flex-md-column.justify-content-between.py-1.pt-md-0.pb-md-2 > div.d-flex.flex-column.flex-md-row.justify-content-between.mb-md-2.text-center > div.mb-1.mb-md-0 > p", (result) => { return result.replace("Avslutas ", ""); })
+            endTime: await puppeteerHelper().getSelectorText(".bid-details-time-title", "textContent") as string
         };
     } else {
         pageInfo = {
