@@ -6,8 +6,8 @@ let browserInstance: puppeteer.Page;
 // Bid is a bid on an auction
 interface Bid {
     bidder: string;
-    bid: number;
-    time: number;
+    bid: string;
+    time: string;
 }
 
 // AuctionInfo is the information that is available on a auction page (e.g. a bid)
@@ -85,7 +85,7 @@ function puppeteerHelper() {
         getAllBids: async () => {
             // Open bid history
             await browserInstance.click(".bid-details-bids-title > span > a");
-            await browserInstance.waitForSelector(".tr-modal-container");
+            await browserInstance.waitForSelector(".table-fixed > tbody:nth-child(2) > tr:nth-child(1)");
 
             // Wait for bid history to load and get all bids
             const _result_ = await browserInstance.evaluate(() => {
@@ -98,8 +98,8 @@ function puppeteerHelper() {
 
                     bids.push({
                         bidder: bidder,
-                        bid: parseFloat(bid.replace("kr", "")),
-                        time: Date.parse(time)
+                        bid: bid,
+                        time: time
                     });
                 });
 
@@ -171,8 +171,9 @@ async function setup() {
         console.log("Could not click accept cookies");
     }
 
+    // Attempt to remove language selection
     try {
-        await browserInstance.waitForSelector("#tr-modal-body > div.position-absolute");
+        await browserInstance.waitForSelector("#tr-modal-body > div.position-absolute", { timeout: 1000 });
         await browserInstance.click("#tr-modal-body > div.position-absolute > button");
     } catch (e) {
         console.log("Could not remove language selection");
