@@ -269,10 +269,19 @@ async function getProductInfo(product_url: string) {
 
     console.log(pageInfo);
     console.log("Done scraping")
-    process.exit(0);
+    return pageInfo
+}
+
+/**
+ * Run cli mode if a product url is provided as a command line argument
+ */
+async function cli() {
+    const product_url = process.argv[2];
+    await getProductInfo(product_url);
+
+    process.exit(0)
 }
 
 if (process.argv[2]) {
-    const product_url = process.argv[2];
-    getProductInfo(product_url);
+    cli()
 }
