@@ -1,4 +1,5 @@
 //Puppeteer library
+export { getProductInfo }
 import * as puppeteer from "puppeteer";
 let browserInstance: puppeteer.Page;
 
@@ -69,7 +70,6 @@ function puppeteerHelper() {
                 _result_ = await browserInstance.$eval(selector, (element, property) => { return element[property] }, property);
 
                 // Check if callback is defined and return result
-                console.log("Result: " + _result_)
                 if (callback)
                     return callback(_result_);
                 else
@@ -212,7 +212,7 @@ async function startBrowser(product_url: string) {
  * @returns The item type (auction or product)
  */
 async function getItemType() {
-    // TODO: Check if auction is ended
+    // TODO: Check type of product (auction or product)
     return "auction"
 }
 
@@ -234,7 +234,7 @@ async function getProductInfo(product_url: string) {
             highestBid: await puppeteerHelper().getSelectorText(".animate-on-value-change_animate-on-value-change__vU1Oh > span:nth-child(1)", "textContent", (result) => { return result; }) as string,
             timeLeft: await puppeteerHelper().getSelectorText("div.flex-md-row:nth-child(2) > div:nth-child(2) > p:nth-child(1) > span:nth-child(1)", "textContent", (result) => { return result != undefined ? result : 0 }) as string,
             buyNowPrice: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", "textContent", (result) => { return result != undefined ? result : 0 }) as string,
-            buyNowAvailable: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", "textContent", (result) => { return result != undefined ? false : true }) as boolean,
+            buyNowAvailable: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", "textContent", (result) => { return result != undefined ? true : false }) as boolean,
             description: await puppeteerHelper().getSelectorText(".overflow-hidden.text-break.position-relative", "textContent") as string,
             allBids: await puppeteerHelper().getAllBids() as Bid[],
             numberOfBids: (await puppeteerHelper().getAllBids() as Bid[]).length,
