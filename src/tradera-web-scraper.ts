@@ -107,7 +107,10 @@ function puppeteerHelper() {
             });
 
             // Close bid history
-            await browserInstance.click(".bid-details-bids-title > span > a");
+            await browserInstance.click(".tr-modal-header > button:nth-child(2)");
+
+            // screenshot
+            await browserInstance.screenshot({ path: "screenshot.png" });
 
             // Check if callback is defined and return result
             return _result_;
@@ -166,6 +169,13 @@ async function setup() {
         await browserInstance.click("#qc-cmp2-ui > div.qc-cmp2-footer.qc-cmp2-footer-overlay.qc-cmp2-footer-scrolled > div > button.css-14ubilm");
     } catch (e) {
         console.log("Could not click accept cookies");
+    }
+
+    try {
+        await browserInstance.waitForSelector("#tr-modal-body > div.position-absolute");
+        await browserInstance.click("#tr-modal-body > div.position-absolute > button");
+    } catch (e) {
+        console.log("Could not remove language selection");
     }
 }
 
