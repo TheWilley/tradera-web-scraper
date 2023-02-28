@@ -190,7 +190,7 @@ async function startBrowser(product_url: string) {
     }
 
     // Check if product url is valid
-    if (product_url == undefined || !isValidUrl(product_url) || !/^.*tradera\.(com|se)\/item.*$/.test(product_url)) {
+    if (product_url == undefined || !isValidUrl(product_url) || !/^.*tradera\.(com|se)(\/[a-z]{2})?\/item.*$/.test(product_url)) {
         console.log("No product url provided, invalid url or url is not a tradera item");
         process.exit(0);
     }
