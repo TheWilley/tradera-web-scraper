@@ -1,6 +1,6 @@
 //Puppeteer library
-const pt = require("puppeteer");
-let browserInstance: Page;
+import * as puppeteer from "puppeteer";
+let browserInstance: puppeteer.Page;
 
 // Bid is a bid on an auction
 interface Bid {
@@ -61,26 +61,22 @@ type PageInfo = AuctionInfo | ProductInfo;
  */
 function puppeteerHelper() {
     return {
-        getSelectorText: async (selector: string, callback?: (_result_: string) => unknown, callbackError?: (_result_: string) => unknown) => {
+        getSelector: async (selector: string, callback: (_result_: puppeteer.JSHandle) => unknown) => {
             // To make the variable available in the catch block
             var _result_;
 
             // Try to get the text from the selector
             try {
-                _result_ = await browserInstance.evaluate((selector: string) => {
+                _result_ = await browserInstance.evaluateHandle((selector: string) => {
                     const element = document.querySelector(selector);
 
                     return (element as HTMLElement).innerText;
                 }, selector);
 
                 // Check if callback is defined and return result
-                if (callback)
-                    return callback(_result_);
-                else
-                    return _result_;
+                return callback(_result_);
             } catch (e) {
-                if (callbackError) return callbackError(_result_)
-                else return undefined;
+                return "Error";
             }
 
         },
@@ -200,7 +196,7 @@ async function startBrowser(product_url: string) {
         process.exit(0);
     }
     // Launch browser in headless mode
-    const browser = await pt.launch();
+    const browser = await puppeteer.launch();
     // Browser new page
     const page = await browser.newPage();
     // Launch URL
@@ -217,7 +213,7 @@ async function startBrowser(product_url: string) {
  * @returns The item type (auction or product)
  */
 async function getItemType() {
-    if (await puppeteerHelper().getSelectorText(".bid-details-time-title")) {
+    if (await puppeteerHelper().getSelector(".bid-details-time-title")) {
         return "auction"
     } else {
         return "product"
@@ -236,20 +232,20 @@ async function getProductInfo(product_url: string) {
     // TODO: Make all selectors use jsselector from chromiun dev tools instead of css selectors (they are more reliable)
     if (await getItemType() == "auction") {
         pageInfo = {
-            sellerName: await puppeteerHelper().getSelectorText(".seller-alias"),
-            isAuction: await puppeteerHelper().getSelectorText(".bid-details-bids-title", (result) => { return result.includes("Bud") ? true : false; }),
-            aucutionName: await puppeteerHelper().getSelectorText("#view-item-main"),
-            auctionEnded: await puppeteerHelper().getSelectorText(".my-auto > .heading-london", (result) => { return result.includes("Avslutad") ? true : false; }),
+            sellerName: await puppeteerHelper().getSelector(".seller-alias", async (result) => { return (await result).jsonValue(); }) as string, // Use this format
+            isAuction: await puppeteerHelper().getSelector(".bid-details-bids-title", (result) => { return result.includes("Bud") ? true : false; }),
+            aucutionName: await puppeteerHelper().getSelector("#view-item-main"),
+            auctionEnded: await puppeteerHelper().getSelector(".my-auto > .heading-london", (result) => { return result.includes("Avslutad") ? true : false; }),
             allBids: await puppeteerHelper().getAllBids(),
             numberOfBids: (await puppeteerHelper().getAllBids()).length,
-            highestBid: await puppeteerHelper().getSelectorText(".bid-details-amount > span > span", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }),
-            timeLeft: await puppeteerHelper().getSelectorText("div.flex-md-row:nth-child(2) > div:nth-child(2) > p:nth-child(1)", (result) => { return result != "Avslutad" ? result : 0; }),
+            highestBid: await puppeteerHelper().getSelector(".bid-details-amount > span > span", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }),
+            timeLeft: await puppeteerHelper().getSelector("div.flex-md-row:nth-child(2) > div:nth-child(2) > p:nth-child(1)", (result) => { return result != "Avslutad" ? result : 0; }),
             latestBid: await puppeteerHelper().getAllBids((result) => { return result[0]; }),
-            buyNowPrice: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }, () => { return 0 }),
-            buyNowAvailable: await puppeteerHelper().getSelectorText("button.btn-md:nth-child(3)", (result) => { return true; }, () => { return false }),
-            description: await puppeteerHelper().getSelectorText(".overflow-hidden.text-break.position-relative"),
+            buyNowPrice: await puppeteerHelper().getSelector("button.btn-md:nth-child(3)", (result) => { return Number(result.replace(/[^0-9.]/g, "")); }, () => { return 0 }),
+            buyNowAvailable: await puppeteerHelper().getSelector("button.btn-md:nth-child(3)", (result) => { return true; }, () => { return false }),
+            description: await puppeteerHelper().getSelector(".overflow-hidden.text-break.position-relative"),
             images: await puppeteerHelper().getAllImages(),
-            endTime: await puppeteerHelper().getSelectorText("#collapsed_auction_details > div > aside > div.separators_sm-separator__lOmzL.pb-md-2.mb-md-2 > section.bid-details.d-flex.flex-md-column.justify-content-between.py-1.pt-md-0.pb-md-2 > div.d-flex.flex-column.flex-md-row.justify-content-between.mb-md-2.text-center > div.mb-1.mb-md-0 > p", (result) => { return result.replace("Avslutas ", ""); })
+            endTime: await puppeteerHelper().getSelector("#collapsed_auction_details > div > aside > div.separators_sm-separator__lOmzL.pb-md-2.mb-md-2 > section.bid-details.d-flex.flex-md-column.justify-content-between.py-1.pt-md-0.pb-md-2 > div.d-flex.flex-column.flex-md-row.justify-content-between.mb-md-2.text-center > div.mb-1.mb-md-0 > p", (result) => { return result.replace("Avslutas ", ""); })
         };
     } else {
         pageInfo = {
@@ -267,14 +263,7 @@ async function getProductInfo(product_url: string) {
     process.exit(0);
 }
 
-// Check if the module is being executed as the main module or not
-if (require.main === module) {
-    // If the module is being executed as the main module,
-    // call getProductInfo with the first command line argument
+if (process.argv[2]) {
     const product_url = process.argv[2];
     getProductInfo(product_url);
-} else {
-    // If the module is being required as a library,
-    // export the getProductInfo function
-    module.exports = { getProductInfo: getProductInfo };
 }
